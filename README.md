@@ -1,10 +1,10 @@
 # Protein Binding Site Prediction with Diffusion-Augmented Graph Neural Networks
 
-This project aims to accurately predict **residue-level protein binding sites** using a **Graph Neural Network (GNN)** pipeline enhanced by a **diffusion-inspired generative model**. It integrates large-scale protein embeddings (ESM-3), edge prediction, and class-imbalanced data augmentation.
+This project aims to accurately predict **residue-level protein binding sites** using a **Graph Neural Network (GCN)** pipeline enhanced by a **diffusion-inspired generative model**. It integrates large-scale protein embeddings (ESM-3), edge prediction, and class-imbalanced data augmentation.
 
 ## 🔍 Overview
 ### Key Components:
-- **ESM-3 Representation**: Residue-level embeddings using [Meta's ESM-3](https://huggingface.co/facebook/esm2_t33_650M_UR50D).
+- **ESM-2 Representation**: Residue-level embeddings using [Meta's ESM-2](https://huggingface.co/facebook/esm2_t33_650M_UR50D).
 - **Diffusion Generator**: Generates synthetic positive (binding) samples from noise.
 - **Edge Predictor**: Builds structural edges between generated and real nodes to form enhanced graph G*.
 - **GCN + MLP**: Classifies binding residues using graph-based neighborhood aggregation and final dense layers.
@@ -26,7 +26,7 @@ This project aims to accurately predict **residue-level protein binding sites** 
 - Python ≥ 3.8  
 - PyTorch ≥ 2.0  
 - [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/)  
-- `fair-esm` (ESM-3 from Meta AI)  
+- `fair-esm` (ESM-2 from Meta AI)  
 - scikit-learn  
 - tqdm (optional)
 
