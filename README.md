@@ -36,7 +36,7 @@ Install requirements:
 pip install torch torchvision torchaudio
 pip install torch-geometric
 pip install fair-esm scikit-learn tqdm
-🚀 How to Run
+### 🚀 How to Run
 1.Prepare raw data in Raw_data/ folder:
 >protein_name
 SEQUENCE...
