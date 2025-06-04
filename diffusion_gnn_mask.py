@@ -9,6 +9,9 @@ from torch_geometric.loader import DataLoader
 from sklearn.metrics import confusion_matrix, matthews_corrcoef, roc_auc_score, recall_score, f1_score
 import random
 import numpy as np
+from modules.model import GCN_with_MLP
+from modules.model import FocalLoss
+import torch.optim as optim
 
 
 # --- 1. Diffusion Schedule ---
@@ -84,24 +87,54 @@ def sample(model, x, edge_index, alphas, alphas_bar, T, device):
 
 
 # --- 6. Training Loop ---
-def train_model(dataset, in_dim, hidden_dim, T, epochs, lr, device):
-    betas, alphas, alphas_bar = get_diffusion_schedule(T)
-    model = DiffusionGNN(in_dim, hidden_dim, T).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    loader = DataLoader(dataset, batch_size=1, shuffle=True)
+def train_model(balanced_data, feature_dim, device):
+    print("Training model with balanced dataset...")
+    loader = DataLoader(balanced_data, batch_size=8, shuffle=True)
+    in_channels = feature_dim  # 使用传入的 feature_dim
+    model = GCN_with_MLP(
+        in_channels=in_channels,
+        hidden_channels=64,
+        gcn_out_channels=64,
+        mlp_hidden=64,
+        out_classes=2
+    ).to(device)
 
-    for epoch in range(epochs):
-        total_loss = 0
-        for data in loader:
-            t = random.randint(0, T - 1)
+    # 设置正类的权重（例如，正类的权重设置为5倍）
+    weight = torch.tensor([1.0, 5.0]).to(device)  # 正类加权5倍
+    criterion = FocalLoss(alpha=1.0, gamma=2.0, weight=weight)  # 使用 Focal Loss
+
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+
+    best_acc = 0.0
+    for epoch in range(50):
+        model.train()
+        total_loss, correct, total = 0, 0, 0
+        for batch in loader:
+            batch = batch.to(device)  # Move the batch to the correct device
             optimizer.zero_grad()
-            loss = train_step(model, data, t, alphas_bar, device)
+            out = model(batch.x, batch.edge_index)
+            loss = criterion(out, batch.y)
             loss.backward()
             optimizer.step()
-            total_loss += loss.item()
-        print(f"Epoch {epoch+1}, Loss: {total_loss/len(loader):.4f}")
 
-    return model, betas, alphas, alphas_bar
+            pred = out.argmax(dim=1)
+            correct += (pred == batch.y.to(device)).sum().item()  # Move batch.y to device
+            total += batch.num_nodes
+            total_loss += loss.item()
+
+        acc = correct / total
+        print(f"Epoch {epoch + 1}/50 - Loss: {total_loss / len(loader):.4f} - Acc: {acc:.4f}")
+
+        # 保存最优模型
+        if acc > best_acc:
+            best_acc = acc
+            torch.save(model.state_dict(), 'Weights/best_model.pt')  # 保存模型
+            print(f"Saved best model at epoch {epoch + 1} (Acc: {acc:.4f})")
+
+    return model
+
+
+
 
 
 # --- 7. Evaluation ---
