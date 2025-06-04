@@ -1,6 +1,6 @@
 # Protein Binding Site Prediction with Diffusion-Augmented Graph Neural Networks
 
-This project aims to accurately predict **residue-level protein binding sites** using a **Graph Neural Network (GCN)** pipeline enhanced by a **diffusion-inspired generative model**. It integrates large-scale protein embeddings (ESM-3), edge prediction, and class-imbalanced data augmentation.
+This project aims to accurately predict **residue-level protein binding sites** using a **Graph Neural Network (GNN)** pipeline enhanced by a **diffusion-inspired generative model**. It integrates large-scale protein embeddings (ESM-2), edge prediction, and class-imbalanced data augmentation.
 
 ## 🔍 Overview
 ### Key Components:
