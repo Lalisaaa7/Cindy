@@ -2,31 +2,35 @@ import os
 import torch
 from torch_geometric.data import Data
 from sklearn.model_selection import train_test_split
-
+import esm
 # ---------- 全局 K-mer 词表 ----------
 GLOBAL_VOCAB = {}
 
-# ---------- K-mer Encoding ----------
-def extract_kmer_features(sequence, k=3):
-    kmer_list = []
-    for i in range(len(sequence) - k + 1):
-        kmer = sequence[i:i + k]
-        if kmer not in GLOBAL_VOCAB:
-            GLOBAL_VOCAB[kmer] = len(GLOBAL_VOCAB)
-        kmer_list.append(GLOBAL_VOCAB[kmer])
+esm_model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+esm_model.eval()
+esm_model = esm_model.cuda() if torch.cuda.is_available() else esm_model.cpu()
 
-    one_hot = torch.zeros(len(kmer_list), len(GLOBAL_VOCAB))
-    for i, idx in enumerate(kmer_list):
-        one_hot[i, idx] = 1
-    return one_hot
+# 替代 extract_kmer_features
+def extract_esm2_features(sequence, model, alphabet):
+    batch_converter = alphabet.get_batch_converter()
+    data = [("protein1", sequence)]
+    batch_labels, batch_strs, batch_tokens = batch_converter(data)
+
+    with torch.no_grad():
+        results = model(batch_tokens.to(next(model.parameters()).device), repr_layers=[33], return_contacts=False)
+    token_representations = results["representations"][33][0]
+
+    # 去掉起始/终止符，仅保留真实氨基酸部分
+    return token_representations[1:len(sequence)+1]
+
 
 # ---------- Graph Construction ----------
 def sequence_to_graph(sequence, label, k=3, window_size=5):
-    x = extract_kmer_features(sequence, k)  # shape: [L', D]
-    y = torch.tensor([int(i) for i in label[k - 1:]], dtype=torch.long)
+    x = extract_esm2_features(sequence, esm_model, alphabet)  # 替代原来kmer提特征
+    y = torch.tensor([int(i) for i in label], dtype=torch.long)
 
     num_nodes = x.size(0)
-    assert len(y) == num_nodes, f"label length mismatch after k-mer: {len(label)} vs {num_nodes}"
+    assert len(y) == num_nodes, f"label length mismatch ({len(label)} vs {num_nodes})"
 
     edge_index = []
     for i in range(num_nodes):
@@ -36,6 +40,7 @@ def sequence_to_graph(sequence, label, k=3, window_size=5):
 
     edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
     return Data(x=x, edge_index=edge_index, y=y)
+
 
 # ---------- TXT 文件读取 ----------
 def parse_txt_file(path):
@@ -55,10 +60,10 @@ def parse_txt_file(path):
                 if len(seq) == len(label):
                     data = sequence_to_graph(seq, label)
                     data.name = name
-                    data.source_file = os.path.basename(path)  # ✅ 添加这句
+                    data.source_file = os.path.basename(path)  # 添加这句
                     data_list.append(data)
                 else:
-                    print(f"⚠️ Skipping {name}: length mismatch ({len(seq)} vs {len(label)})")
+                    print(f"Skipping {name}: length mismatch ({len(seq)} vs {len(label)})")
             buffer = [line]
         else:
             buffer.append(line)
@@ -70,7 +75,7 @@ def parse_txt_file(path):
         if len(seq) == len(label):
             data = sequence_to_graph(seq, label)
             data.name = name
-            data.source_file = os.path.basename(path)  # ✅ 添加这句
+            data.source_file = os.path.basename(path)  #  添加这句
             data_list.append(data)
         else:
             print(f"⚠️ Skipping {name}: length mismatch ({len(seq)} vs {len(label)})")
@@ -79,14 +84,21 @@ def parse_txt_file(path):
 
 
 # ---------- 数据加载入口 ----------
-def load_raw_dataset(folder_path):
+def load_raw_dataset(path):
     all_data = []
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.txt'):
-            file_path = os.path.join(folder_path, filename)
-            file_data = parse_txt_file(file_path)
-            all_data.extend(file_data)
+    if os.path.isdir(path):
+        for filename in os.listdir(path):
+            if filename.endswith('.txt'):
+                file_path = os.path.join(path, filename)
+                file_data = parse_txt_file(file_path)
+                all_data.extend(file_data)
+    elif os.path.isfile(path) and path.endswith('.txt'):
+        file_data = parse_txt_file(path)
+        all_data.extend(file_data)
+    else:
+        raise ValueError(f" 无效的路径: {path}")
     return all_data
+
 
 # ---------- 数据集划分逻辑 ----------
 def split_dataset_by_filename(all_data):
@@ -102,7 +114,7 @@ def split_dataset_by_filename(all_data):
     print(f"Test data size: {len(test_data)}")
 
     if len(train_data) == 0 or len(test_data) == 0:
-        print("❌ No matching files found. Please check the data in the 'Raw_data' folder.")
+        print(" No matching files found. Please check the data in the 'Raw_data' folder.")
         return [], [], []
 
     train_data, val_data = train_test_split(train_data, test_size=0.15, random_state=42)
