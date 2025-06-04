@@ -1,50 +1,97 @@
 import torch
-from diffusion_gnn_mask import evaluate_model, DiffusionGNN, get_diffusion_schedule
-from data_loader_from_raw import load_raw_dataset, split_dataset_by_filename
+from modules.model import GCN_with_MLP
+from data_loader_from_raw import load_raw_dataset
+from torch_geometric.data import DataLoader
+from sklearn.metrics import f1_score, matthews_corrcoef, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
-import warnings
+def test_model(model, test_data, device):
+    print("\n Evaluating on test set...")
+    model.eval()
+    loader = DataLoader(test_data, batch_size=1, shuffle=False)
 
-warnings.filterwarnings("ignore")
+    total, correct = 0, 0
+    all_preds, all_labels, all_probs = [], [], []
+
+    for batch in loader:
+        batch = batch.to(device)
+        out = model(batch.x, batch.edge_index)  # logits
+        probs = F.softmax(out, dim=1)[:, 1]  # 取正类概率
+        pred = out.argmax(dim=1)
+
+        correct += (pred == batch.y).sum().item()
+        total += batch.num_nodes
+
+        all_preds.extend(pred.cpu().numpy())
+        all_labels.extend(batch.y.cpu().numpy())
+        all_probs.extend(probs.detach().cpu().numpy())
+
+    accuracy = correct / total
+    f1 = f1_score(all_labels, all_preds, average='binary', pos_label=1)
+    mcc = matthews_corrcoef(all_labels, all_preds)
+
+    try:
+        auc = roc_auc_score(all_labels, all_probs)
+    except:
+        auc = 0.0  # 防止仅含单类时报错
+
+    print(f"Test Accuracy: {accuracy:.4f}")
+    print(f"F1 Score: {f1:.4f}")
+    print(f"MCC: {mcc:.4f}")
+    print(f"AUC: {auc:.4f}")
+
+    # ROC 曲线可视化
+    fpr, tpr, _ = roc_curve(all_labels, all_probs)
+    plt.figure()
+    plt.plot(fpr, tpr, label=f"AUC = {auc:.4f}")
+    plt.plot([0, 1], [0, 1], linestyle='--', color='gray')
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curve")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    return accuracy, f1, mcc, auc
 
 
 def main():
-    print("Loading test set from ./Raw_data ...")
+    print(" Loading test set from ./Raw_data/DNA-181_Test.txt ...")
 
-    all_data = load_raw_dataset('./Raw_data')
-    print(f"Loaded {len(all_data)} data samples")  # 添加这行代码以打印数据样本数量
+    all_data = load_raw_dataset('./Raw_data/DNA-181_Test.txt')
+    print(f"Loaded {len(all_data)} test samples.")
 
-    train_data, val_data, test_data = split_dataset_by_filename(all_data)
-
-    if len(test_data) == 0:
-        print(" No test data found. Check if file names contain 'DNA-46_Test', 'DNA-129_Test', or 'DNA-181_Test'.")
+    if len(all_data) == 0:
+        print(" No test data found. Please check the file.")
         return
 
-    # 接下来的代码...
-
-
-    # Model config (must match training config)
-    in_dim = test_data[0].x.shape[1]  # Feature dimension
-    hidden_dim = 64
-    T = 500
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Load trained model weights
-    model = DiffusionGNN(in_dim, hidden_dim, T).to(device)
+    # 确定输入维度
+    # 替换为训练时的实际维度（用 ESM2 的输出为1280维）
+    in_dim = 1280
+    model = GCN_with_MLP(
+        in_channels=in_dim,
+        hidden_channels=64,
+        gcn_out_channels=64,
+        mlp_hidden=64,
+        out_classes=2
+    ).to(device)
 
-    # Ensure the saved model exists at the specified path
+    # 加载训练好的模型参数
     try:
-        model.load_state_dict(torch.load('./saved_model.pt'))
+        model.load_state_dict(torch.load('./Weights/best_model.pt'))
         model.eval()
+        print(" Loaded model weights successfully.")
     except FileNotFoundError:
-        print("Model weights not found at './saved_model.pt'. Please check the path.")
+        print(" Model weights not found at './Weights/best_model.pt'")
         return
 
-    # Diffusion schedule
-    betas, alphas, alphas_bar = get_diffusion_schedule(T)
-
-    print("\n Evaluating on test set...")
-    evaluate_model(model, test_data, alphas, alphas_bar, T, device)
+    # 模型评估
+    test_model(model, all_data, device)
 
 
 if __name__ == '__main__':
     main()
+
