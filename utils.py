@@ -1,14 +1,3 @@
-import torch
-from torch_geometric.data import Data
-from copy import deepcopy
-from scipy.spatial.distance import pdist, squareform
-import random
-import math
-import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
-
-
 # 处理训练集
 def process_train_dataset(train_data):
     new_train_data = []
