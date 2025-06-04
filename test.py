@@ -8,7 +8,7 @@ warnings.filterwarnings("ignore")
 
 
 def main():
-    print("🧪 Loading test set from ./Raw_data ...")
+    print("Loading test set from ./Raw_data ...")
 
     all_data = load_raw_dataset('./Raw_data')
     print(f"Loaded {len(all_data)} data samples")  # 添加这行代码以打印数据样本数量
@@ -16,7 +16,7 @@ def main():
     train_data, val_data, test_data = split_dataset_by_filename(all_data)
 
     if len(test_data) == 0:
-        print("❌ No test data found. Check if file names contain 'DNA-46_Test', 'DNA-129_Test', or 'DNA-181_Test'.")
+        print(" No test data found. Check if file names contain 'DNA-46_Test', 'DNA-129_Test', or 'DNA-181_Test'.")
         return
 
     # 接下来的代码...
@@ -36,13 +36,13 @@ def main():
         model.load_state_dict(torch.load('./saved_model.pt'))
         model.eval()
     except FileNotFoundError:
-        print("❌ Model weights not found at './saved_model.pt'. Please check the path.")
+        print("Model weights not found at './saved_model.pt'. Please check the path.")
         return
 
     # Diffusion schedule
     betas, alphas, alphas_bar = get_diffusion_schedule(T)
 
-    print("\n📊 Evaluating on test set...")
+    print("\n Evaluating on test set...")
     evaluate_model(model, test_data, alphas, alphas_bar, T, device)
 
 
