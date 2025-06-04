@@ -1,6 +1,7 @@
 # Protein Binding Site Prediction with Diffusion-Augmented Graph Neural Networks
 
-This project aims to accurately predict **residue-level protein binding sites** using a **Graph Neural Network (GNN)** pipeline enhanced by a **diffusion-inspired generative model**. It integrates large-scale protein embeddings (ESM-2), edge prediction, and class-imbalanced data augmentation.
+This project aims to predict protein-DNA binding sites using a diffusion model and Graph Neural Networks (GNNs). The process starts by converting protein sequences into graphs, followed by the use of graph neural networks (GNN) to model these structures. A diffusion-based model is applied to augment the dataset, improving the model's ability to predict protein-DNA binding sites. The ultimate goal is to provide an efficient prediction tool for studying protein-DNA interactions.
+
 
 ## 🔍 Overview
 ### Key Components:
@@ -26,16 +27,19 @@ This project aims to accurately predict **residue-level protein binding sites** 
 - Python ≥ 3.8  
 - PyTorch ≥ 2.0  
 - [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/)  
-- `fair-esm` (ESM-2 from Meta AI)  
+- ESM (for protein sequence representations)
 - scikit-learn  
-- tqdm (optional)
+- matplotlib
 
 Install requirements:
 
 ```bash
 pip install torch torchvision torchaudio
 pip install torch-geometric
-pip install fair-esm scikit-learn tqdm
+pip install transformers
+pip install scikit-learn
+pip install matplotlib
+
 ### 🚀 How to Run
 1.Prepare raw data in Raw_data/ folder:
 >protein_name
